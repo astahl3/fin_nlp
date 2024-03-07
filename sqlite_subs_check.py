@@ -10,7 +10,7 @@ import pandas as pd
 import sqlite3
 
 # Connect to the SQLite database
-conn = sqlite3.connect('/Users/astahl/fin_nlp_data/investing_submissions.db')
+conn = sqlite3.connect('/Users/astahl/fin_nlp_data/reddit/sqlite/stocks_submissions.db')
 
 # Query the database and load the results into a DataFrame
 df = pd.read_sql_query("SELECT * FROM submissions", conn)
