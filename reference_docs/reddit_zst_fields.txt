@@ -1,0 +1,78 @@
+---------------------------------------------------------------- 
+------- REDDIT SUBMISSIONS ZST FILES ------- 
+---------------------------------------------------------------- 
+
+OVERVIEW
+=========
+
+In the extracted .zst file, each submission is on a continuous line and uses 
+a key-value pairing format, which looks like this:
+
+{"field_name_1":field_value_1,"field_name_2":"field_value_2", ... }
+
+Notes:
+	-- all field names are in double quotes
+	-- field values that are strings are also enclosed by double quotes 
+	-- field values that are true/false or integer values are not in double quotes
+	-- full site history through 12/31/2023; monthly histories for 2024 (through 06/30/2024)
+
+FIELD NAMES & FIELD VALUES
+==========================
+
+	author: "string"
+	author_created_utc: posix utc
+	author_fullname: "string"
+	created_utc: posix utc
+	domain: "string.investing" --> e.g., "self.investing"
+	id: "string" --> e.g., "1006xo4"
+	is_created_from_ads_ui: true/false
+	is_crosspostable: true/false
+	is_video: true/false
+	num_comments: integer 
+	num_crossposts: integer
+	over_18: true/false
+	pinned: true/false
+	retrieved_on: posix utc
+	score: integer
+	selftext: "string" --> e.g., "buy microsoft \n it's a great stock \n \r trust me"
+	send_replies: true/false
+	subreddit: "string"
+	subreddit_id: "string" --> e.g., "t5_2qhhq"
+	subreddit_subscribers: integer
+	title: "string"
+	upvote_ratio: real --> e.g., 0.63
+
+------------------------------------------------------------- 
+------- REDDIT COMMENTS ZST FILES ------- 
+------------------------------------------------------------- 
+
+OVERVIEW
+=========
+
+In the extracted .zst file, each submission is on a continuous line and uses 
+a key-value pairing format, which looks like this:
+
+{"field_name_1":field_value_1,"field_name_2":"field_value_2", ... }
+
+Notes:
+	-- all field names are in double quotes
+	-- field values that are strings are also enclosed by double quotes 
+	-- field values that are true/false or integer values are not in double quotes
+	-- full site history through 12/31/2023; monthly histories for 2024 (through 06/30/2024)
+
+FIELD NAMES & FIELD VALUES
+==========================
+
+	author: "string"
+	author_created_utc: number
+	author_fullname: "string"	--> e.g., "t2_c7erst62"
+	body: "string" --> e.g., "I agree with your statements \n \r they're great"
+	created_utc: number
+	id: "string"
+	is_submitter: true/false
+	link_id: "string" --> e.g., "t3_zzqpwr"
+	name: "string" --> e.g., "t1_j2fxm1e"
+	parent_id: "string" --> e.g., "t1_j2fxfix"
+	score: number
+	subreddit: "string"
+	subreddit_id: "string"

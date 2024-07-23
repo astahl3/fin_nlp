@@ -1,0 +1,87 @@
+--------------------------------------------------------------------- 
+----------- FIN_NLP FOLDER STRUCTURE  -----------
+--------------------------------------------------------------------- 
+
+fin_nlp
+	sources
+		reddit
+			submissions
+			comments
+		discord
+		twitter
+		blogs
+		industry_pubs
+	gpt
+		reddit
+			submissions
+			comments
+	wrds
+		crsp
+		datastream
+	support
+				
+fin_nlp_data
+
+---------------------------------------------------------------------- 
+------------------ FIN_NLP FOLDER INFO -----------------
+---------------------------------------------------------------------- 
+
+# Main directory of python source code files of the trade idea AI project
+../fin_nlp/
+	
+	# Files for working with the history of stock / investing-related subreddits (e.g., r/wallstreetbets)
+	reddit/
+		
+		# Programs for working with reddit submissions (.zst files)
+		submissions/
+		-- submission_data_to_db.py
+		-- title_processing_functions.py
+		-- gen_submissions_sample.py
+		
+		# Programs for working with reddit comments (.zst files)
+		
+		
+	# Programs for working with the history of stock / investing-related Discord channels
+	discord/
+			
+	# Programs for working with the history of stock / investing-related discussion on Twitter / X
+	twitter/
+	
+	# Programs for working with the history of stock / investing-related posts on blogs
+	blogs/
+		
+	# Programs for working with the history of professional, industry publications on stocks and trading (e.g., Morningstar)
+	industry_pubs/
+
+	# Programs for working with OpenAI models (GPT-40 Mini and GPT-3.5 Turbo Instruct)
+	gpt/
+			
+			# Folder for reddit sentiment prompts and programs
+			reddit/ 
+				
+				# For extracting sentiment (e.g., bearish or bullish) about reddit submissions
+				submissions/
+					-- gpt40mini_sentiment_extractor.py
+					-- gpt_sentiment_extractor.py
+			
+				# Sentiment (towards submission or company / stock) or cluster information about submission comments
+				comments/
+			
+				# Text files with prompts for engaging with the GPT models
+				prompts/
+			
+	# Programs that access the Wharton Research Data Services (WRDS) SQL database for security information
+	wrds/
+		
+			# Programs that use the Center for Research in Security Prices (CRSP) for security / stock histories
+			crsp/
+			-- gen_sub_performance.py
+			
+			# Programs that use Thomson Reuters Datastream for security / stock histories
+			datastream/
+		
+		# Programs or simple scripts that perform a variety of helper tasks or functions
+		support/
+			-- sqlite_db_check.py
+			-- sqlite_wrds_db_check.py
+			-- query_db_tables.py

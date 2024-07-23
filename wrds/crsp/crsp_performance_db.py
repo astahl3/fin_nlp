@@ -9,6 +9,7 @@ of investment or trade ideas communicated on social media are assessed.
 
 Author: Aaron M. Stahl (2024) // aaron.m.stahl@gmail.com // astahl3.github.io 
 '''
+
 import pandas as pd
 import pandas_market_calendars as mcal
 import wrds
@@ -40,9 +41,9 @@ lad = datetime(year=2024, month=3, day=28).date()
 lad_str = lad.strftime('%Y-%m-%d')
 
 def get_current_ticker(db, permno):
-    '''
-    Return the current ticker for given permno
-    '''
+    """
+    Returns current ticker (as of desired through-date 'lad') for given permno
+    """
     query = f"""
             SELECT *
             FROM crsp_q_stock.stocknames_v2
@@ -62,10 +63,10 @@ def get_current_ticker(db, permno):
     return nameinfo['ticker'].iloc[0]    
     
 def cusip9_to_isin(cusip9, country_code='US'):
-    '''
+    """
     Calculate the check digit for the security ISIN using the passed 'cusip9'
     and (optional) 'country_code' via the Luhn algorithm and return the result
-    '''
+    """
 
     base_isin = country_code + cusip9
 
@@ -120,10 +121,10 @@ def get_nearest_market_date(dt):
         return pd.Timestamp(future_schedule.index[0])
 
 def are_returns_populated(cn, permno, start_date, end_date):
-    '''
+    """
     Checks if there is a return in the desired time range; returns true
     if there is a single return within the range
-    '''
+    """
     
     query = f"""
             SELECT COUNT(*) FROM {performance_table}
@@ -142,9 +143,6 @@ def is_stockinfo_updated(cn, permno, desired_update_dt):
     query = f""" SELECT lastupd FROM {security_table} WHERE permno = ? """
     c_temp = cn.cursor()
     c_temp.execute(query, (permno))
-    
-    
-    
     return c_temp.fetchone()
 
 def main():
@@ -372,12 +370,11 @@ def main():
             
         count += 1
         print(f"count = {count}")
-        #if count == 100:
-        #    break
+        with open(path_logfile_write, 'a') as lf:
+            lf.write("********** Program complete \n")
+            lf.write(f"********** Returns populated for {count} tickers \n\n")
 
     conn_out.close()
-
-
 
 if __name__ == "__main__":
     main()

@@ -1,60 +1,51 @@
 '''
-Converts extracted .zst reddit site submission dumps to a SQlite database
+Converts extracted .zst reddit site submission dumps to a SQlite database.
 
-Version: retains only submissios which mention a ticker or company alias in the
-Wilshire 5000 *or* is a due diligence post, *and* satisfies a certain minimum 
-length requirement (so as to avoid links to other sites, meme posts, etc.)
+This script only retains submissions which include a ticker or company alias 
+in the submission title.
 
 Author: Aaron M. Stahl (2024) // aaron.m.stahl@gmail.com // astahl3.github.io
 '''
-
 import json
 import sqlite3
 import pathlib
 import pandas as pd
 import re
 from datetime import datetime
-
-# Subreddit (must match with file path below)
-subreddit_domain = 'self.wallstreetbets'
-#subreddit_domain = 'self.stocks'
-#subreddit_domain = 'self.investing'
+import title_processing_functions as tf
+#import pdb # for debugging only
 
 # Global parameters
 n_per_batch = 100 # submissions to process and write per batch
-ticker_counts = 0 # ticker matches (rank 1 qualifier)
-alias_counts = 0 # alias matches (rank 2 qualifier)
-dd_counts = 0 # due diligence matches with alias or ticker match
-dd_na_counts = 0 # due diligence matches, no company match (rank 3 qualifier)
+counts_ticker_match_symbol = 0 # ticker matches with $ symbol
+counts_ticker_nomatch_symbol = 0 # ticker with $ symbol but no ticker match
+counts_ticker_match_nosymbol = 0 # ticker match without $ symbol
+counts_alias_match = 0 # company alias matches
+counts_dd_nomatch = 0 # tagged due diligence but no ticker or alias match
+counts_dd = 0 # total submissions tagged as due diligence 
 ticker_matches = {} # dictionary for ticker matches
 alias_matches = {} # dictionary for alias matches
 min_L = 60 # minimum number of words required for the post
+single_match = True
+alias_dict = {}
 
 # Subreddit submissions path: /Users/astahl/fin_nlp_data/reddit/...
 # r/stocks: stocks_submissions.txt
 # r/investing: investing_submissions.txt
 # r/wallstreetbets: wallstreetbets_submissions.txt
 
+subreddit_domain = 'self.investing' # must match file path(s) below
+table_name = 'single_ticker_match'
+
 # File paths
 path_reddit_db_read = \
-    "/Users/astahl/fin_nlp_data/reddit/wallstreetbets_submissions.txt"
+    "/Users/astahl/fin_nlp_data/reddit/investing_submissions.txt"
 path_reddit_db_write = \
-    "/Users/astahl/fin_nlp_data/reddit/sqlite/qualified_submissions_test.db"
+    "/Users/astahl/fin_nlp_data/reddit/sqlite/submissions.db"
 path_stocks_db_read = \
-    "/Users/astahl/fin_nlp_data/us_companies_5000.csv"
+    "/Users/astahl/fin_nlp_data/ticker_lists/us_companies_5000.csv"
 path_logfile_write = \
-    "/Users/astahl/fin_nlp_data/reddit/logfiles/logfile.txt"
-
-def check_if_DD(input_string):
-    ''' Return True if title indicates a due diligence post '''
-    
-    global dd_counts
-    if 'dd' in input_string.lower().split() or \
-        'due diligence' in input_string.lower():
-        dd_counts += 1
-        return True
-    else:
-        return False
+    "/Users/astahl/fin_nlp_data/reddit/logfiles/logfile"
     
 def process_submission(submission, fields, tickers=None, aliases=None):
     '''
@@ -71,63 +62,48 @@ def process_submission(submission, fields, tickers=None, aliases=None):
     
     (3) If qualified, check title for due diligence tag and update is_DD field
     '''
-    
-    global ticker_matches
-    global alias_matches
-    global ticker_counts
-    global alias_counts
-    global dd_counts
-    global dd_na_counts
+    global counts_ticker_match_symbol
+    global counts_ticker_nomatch_symbol
+    global counts_ticker_match_nosymbol
+    global counts_dd_nomatch
     
     if (submission.get('domain') == subreddit_domain and 
        submission.get('selftext') != '[removed]' and
        submission.get('selftext') != '' and
        submission.get('selftext') != '[deleted]'):
         
-        title_string = submission.get('title')
         selftext_string = submission.get('selftext')
         
-        # Confirm that it is a due diligence post
+        # Confirm that post satisfies minimum length requirement
         if len(selftext_string.split()) > min_L:
             
-            # Remove common special characters from title to improve alias
-            # and ticker matching reliability
-            for char in ['$', ':', '!', '#', '~']:
-                title_string = title_string.replace(char, '')
+
+            ''' Match type #1: ticker match with symbol e.g., $GME '''
+            submission_qual = \
+                tf.ticker_match_with_symbol(submission, fields, tickers)
             
-            # Check for ticker match in title string
-            for word in title_string.split():
-                if word in tickers:
-                    ticker_counts += 1
-                    submission['company_match'] = word
-                    ticker_matches[word] = ticker_matches.get(word,0)+1
-                    
-                    # Check if this is a due diligence post
-                    submission['is_DD'] = check_if_DD(title_string)
-                            
-                    return tuple(submission.get(field) for field in fields)
+            if submission_qual:
+                if submission_qual == 'multiple_matches':
+                    return None
                 
-            # Does the title contain a string matching an alias?
-            match = re.search(aliases, title_string, re.IGNORECASE)
-            if match:
-                alias_counts += 1
-                matched_alias = match.group(0)
-                submission['company_match'] = matched_alias
-                alias_matches[matched_alias] = \
-                    alias_matches.get(matched_alias,0)+1
+                counts_ticker_match_symbol += 1
+                tmatch = submission['company_match']
+                ticker_matches[tmatch] = ticker_matches.get(tmatch,0)+1
+                return tuple(submission_qual.get(field) for field in fields) 
+
+            ''' Match Type #2: Ticker with $ but no ticker match '''
+            submission_qual = \
+                tf.ticker_nomatch_with_symbol(submission, fields)
                 
-                # Check if this is a due diligence post
-                submission['is_DD'] = check_if_DD(title_string)
+            if submission_qual:
+                if submission_qual == 'multiple_matches':
+                    return None
                 
-                return tuple(submission.get(field) for field in fields)
-            
-            # Add if this is a due diligence post (even without company match)
-            if check_if_DD(title_string):
-                submission['company_match'] = 'N/A'
-                submission['is_DD'] = True
-                dd_na_counts += 1
-                return tuple(submission.get(field) for field in fields)
-                
+                counts_ticker_nomatch_symbol += 1
+                tmatch = submission['company_match']
+                ticker_matches[tmatch] = ticker_matches.get(tmatch,0)+1
+                return tuple(submission_qual.get(field) for field in fields)
+           
     return None
 
 def process_submissions_file(submissions_file, fields, batch_size=2000, 
@@ -153,9 +129,8 @@ def process_submissions_file(submissions_file, fields, batch_size=2000,
 
     '''
     
-    #Process the submissions file in batches and extract desired fields
+    # Process the submissions file in batches and extract desired fields
     with open(submissions_file, "r", encoding="utf-8") as file:
-        submissions = []
         batch = []
         batch_count = 0
         for line in file:
@@ -163,14 +138,13 @@ def process_submissions_file(submissions_file, fields, batch_size=2000,
             submission = {field: submission_data.get(field, None) 
                                   for field in fields}
             
-            # Select qualified submissions and identify 
+            # Select qualified submissions and write to SQlite db 
             processed_submission = process_submission(submission, fields, 
                                                       tickers, aliases)
             if processed_submission:
                 batch.append(processed_submission)
                 if len(batch) >= batch_size:
                     processed_batch = process_batch(batch)
-                    #submissions.extend(processed_batch)
                     write_submissions_to_database(processed_batch)
                     batch = []
                     batch_count += 1
@@ -181,8 +155,7 @@ def process_submissions_file(submissions_file, fields, batch_size=2000,
         # Process the remaining submissions in the last batch
         if batch:
             processed_batch = process_batch(batch)
-            submissions.extend(processed_batch)
-            batch_count += 1
+            write_submissions_to_database(processed_batch)
             total_processed = batch_count * batch_size + len(batch)
             print(f"Wrote {total_processed} entries to db")
             with open(path_logfile_write, 'a') as lf:
@@ -207,7 +180,7 @@ def write_submissions_to_database(submissions):
     c = conn.cursor()
 
     # Create submissions table if it doesn't already exist
-    c.execute('''CREATE TABLE IF NOT EXISTS submissions (
+    c.execute(f'''CREATE TABLE IF NOT EXISTS {table_name} (
                 author TEXT,
                 author_created_utc INTEGER,
                 author_fullname TEXT,
@@ -232,12 +205,13 @@ def write_submissions_to_database(submissions):
                 title TEXT,
                 upvote_ratio REAL,
                 company_match TEXT,
+                match_type TEXT,
                 is_DD BOOLEAN
                 )''')
 
     # Write submissions to database
-    insert_query = '''INSERT OR REPLACE INTO submissions VALUES (?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+    insert_query = f'''INSERT OR REPLACE INTO {table_name} VALUES (?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
     
     for submission in submissions:
         if submission:  # Check if submission is not None
@@ -248,8 +222,11 @@ def write_submissions_to_database(submissions):
     conn.close()
 
 def main():
+    global path_logfile_write
     
     # Open logfile to print header information
+    current_date = datetime.date(datetime.now()).strftime('%d-%m-%Y')
+    path_logfile_write = path_logfile_write + '_' + current_date + '.txt'
     with open(path_logfile_write, 'a') as lf:
         lf.write('\n')
         current_time = datetime.now()
@@ -268,7 +245,7 @@ def main():
               "is_video", "name", "num_comments", "num_crossposts", "over_18",
               "pinned", "retrieved_on", "score", "selftext", "send_replies", 
               "subreddit", "subreddit_id", "subreddit_subscribers", "title",
-              "upvote_ratio", "company_match", "is_DD"]
+              "upvote_ratio", "company_match", "match_type", "is_DD"]
     
     # Load tickers and company names to cross-reference with submission titles
     company_list = pd.read_csv(path_stocks_db_read)
@@ -282,15 +259,22 @@ def main():
     # Create set of all company tickers 
     ticker_set = set(company_list['ticker'])
     
-    # Ignore ticker "A": creates too many false positives
-    ticker_set.remove('A')
-    
-    # Ignore ticker "DD": overlaps with due diligence tag; handled separately
-    ticker_set.remove('DD')
+    # Isolate aliases in new list
+    alias_raw_list = list(company_list['alias'])
+    alias_dict = {}
+    for j in range(0,len(alias_raw_list)):
+        alias_ticker = company_list[company_list['alias'] == 
+                                    alias_raw_list[j]]['ticker'].values[0]
+        aliases = [al.strip() for al in alias_raw_list[j].split(';')]
+        for a in aliases:
+            alias_dict[a] = alias_ticker
         
+    # Make new set of dicts
+    alias_set = set(alias_dict)
+    
     # Assume alias is a set of company aliases; may contain multiple words
     alias_pattern = r'\b(' + '|'.join(re.escape(alias) \
-                    for alias in company_list['alias'].astype(str)) + r')\b'
+                    for alias in alias_set) + r')\b'
 
     # Process submissions file and extract desired fields of qualified 
     # submissions in batches; then write each batch to SQlite database
@@ -303,16 +287,28 @@ def main():
     # Print summary statistics
     with open(path_logfile_write, 'a') as lf:
         lf.write(f"Summary stats for {subreddit_domain}\n")
+        
         lf.write("Ticker matches:\n")   
         for ticker, count in sorted_ticker_matches:
             lf.write(f"{ticker}: {count}\n")
         
-        lf.write("ticker matches: %2.0d, alias matches: %2.0d, " 
-                 % (ticker_counts, alias_counts))
-        lf.write("dd only matches: %2.0d, total unique matches %2.0d \n" 
-                 % (dd_na_counts, ticker_counts+alias_counts+dd_na_counts))
+        lf.write("ticker with sym matches: %2.0d\n" 
+                 % (counts_ticker_match_symbol))
         
-        lf.write("total titles with dd tags: %2.0d\n\n" % (dd_counts))
+        lf.write("ticker with sym but no match: %2.0d\n" 
+                 % (counts_ticker_nomatch_symbol))
+        
+        lf.write("ticker no sym matches: %2.0d\n" 
+                 % (counts_ticker_match_nosymbol))
+        
+        lf.write("alias matches: %2.0d\n" 
+                 % (counts_alias_match))
+        
+        lf.write("due diligence with no ticker or match: %2.0d\n" 
+                 % (counts_dd_nomatch))
+        
+        lf.write("total due diligence tags %2.0d\n"
+                 % (counts_dd))
         
 if __name__ == "__main__":
     main()
